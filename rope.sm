@@ -10,7 +10,7 @@
                                                        (set! weight (if hasL (l 'fullWeight) 0))
                                                        (set! weight (+ weight (string-length text)))
                                                        (set! fullWeight (+ weight (if hasR (r 'fullWeight) 0)))
-                                                       (if #f (display (string-append "updating \""
+                                                       (if #t (display (string-append "updating \""
                                                                                text
                                                                                "\" to have weight "
                                                                                (number->string weight)
@@ -72,7 +72,13 @@
                                                       (if (not (eq? (node 'l) '()))
                                                           (recurser (node 'l) i)
                                                           (substring (node 'text) i (+ i 1)))))))
-                               (recurser rootNode i)))))
+                               (recurser rootNode i))))
+        (simpleConcat (lambda (otherRope) ; Just adds a new node, without care for balance
+                              (let* ((otherRoot (node ((otherRope 'root) 'l) ((otherRope 'root) 'r) ((otherRope 'root) 'weight) "otherRoot"))
+                                     (newRoot (node rootNode '() (+ (rootNode 'fullWeight) (otherRoot 'fullWeight)) "newRoot")))
+                                    (begin ((rootNode 'setRight) otherRoot)
+                                           (set! rootNode newRoot)))))
+        )
         (lambda (str)
           (begin
             (build str)
@@ -80,10 +86,14 @@
             (lambda (proc)
               (case proc
       	        ('root rootNode)
-                ('index (lambda (i) (index i)))
+                ('index index)
+                ('concat simpleConcat)
                 (else #f)))))
   )
 )
 
 (define ex (rope "example_text"))
 ((ex 'index) 0)
+(define ex2 ((ex 'concat) (rope "_second_string")))
+((ex 'root) 'weight)
+((ex 'index) 14)
