@@ -1,24 +1,38 @@
-(define rope 
+(define rope
   (letrec (
            (node (lambda (l r weight text)
-                    (let ((updateWeight (lambda ()
-                                                (begin (set! weight (if (not (eq? l '())) (l 'weight) 0))
-                                                       (set! weight (if (not (eq? r '())) (+ (r 'weight) weight) weight))
-                                                       (set! weight (+ weight (string-length text)))))))
+                    (let* ((fullWeight weight)
+                           (updateWeight (lambda ()
+                                            (let ((hasL (not (eq? l '())))
+                                                  (hasR (not (eq? r '()))))
+                                                (begin (if hasL (l 'updateWeight))
+                                                       (if hasR (r 'updateWeight))
+                                                       (set! weight (if hasL (l 'fullWeight) 0))
+                                                       (set! weight (+ weight (string-length text)))
+                                                       (set! fullWeight (+ weight (if hasR (r 'fullWeight) 0)))
+                                                       (if #f (display (string-append "updating \""
+                                                                               text
+                                                                               "\" to have weight "
+                                                                               (number->string weight)
+                                                                               "\" and fullWeight "
+                                                                               (number->string fullWeight))))
+                                                       (newline))))))
                          (begin
                            (updateWeight)
                            (lambda (val)
                                    (case val 
                                        ('l l)
                                        ('r r)
-                                       ('weight (begin (updateWeight) weight)) ;NOTE cascading weight updates are very inefficient
+                                       ('weight (begin  weight)) ;NOTE cascading weight updates are very inefficient
+                                       ('fullWeight (begin fullWeight))
+                                       ('updateWeight (updateWeight))
                                        ('text text)
                                        ('setRight (lambda (newr) 
-                                                          (begin 
+                                                          (begin
                                                                  ;(display (string-append "Setting r of \"" text "\" to \"" (newr 'text) "\""))
                                                                  (set! r newr)
-                                                                 (updateWeight))))
-                                       ('setLeft  (lambda (newl) (set! l newl) (updateWeight)))))))))
+                                                                 )))
+                                       ('setLeft  (lambda (newl) (set! l newl)))))))))
          (rootNode '())
          (buildTree (lambda (nodeLst)
                             (letrec ((doRow (lambda (prev connectLeft? oldRow newRow)
@@ -30,13 +44,10 @@
                                                             (doRow (car oldRow)
                                                                    (not connectLeft?)
                                                                    (cdr oldRow)
-                                                                   (cons (node (car oldRow) '() ((car oldRow) 'weight) "")
-                                                                         newRow)
-                                                            )
-                                                        )
-                                                    ))))
+                                                                   (append newRow 
+                                                                           (cons (node (car oldRow) '() ((car oldRow) 'weight) "") '()))))))))
                                     (if (eq? (cdr nodeLst) '())
-                                      (car nodeLst)
+                                      (begin ((car nodeLst) 'updateWeight) (car nodeLst))
                                       (buildTree (doRow '() #f nodeLst '()))))))
          (build (lambda (string) 
                          (letrec ((cutter (lambda (string n) 
@@ -53,16 +64,26 @@
                                             (if (eq? strings '())
                                                 (begin (displayNodeList nodes) nodes)
                                                 (nodify (cdr strings) (cons (node '() '() (string-length (car strings)) (car strings)) nodes))))))
-                                 (set! rootNode (buildTree (nodify (cutter string 3) '())))))))
+                                 (set! rootNode (buildTree (nodify (cutter string 3) '()))))))
+        (index (lambda (i)
+                       (letrec ((recurser (lambda (node i)
+                                                  (if (<= (node 'weight) i)
+                                                      (recurser (node 'r) (- i (node 'weight)))
+                                                      (if (not (eq? (node 'l) '()))
+                                                          (recurser (node 'l) i)
+                                                          (substring (node 'text) i (+ i 1)))))))
+                               (recurser rootNode i)))))
         (lambda (str)
           (begin
             (build str)
             (display rootNode)
             (lambda (proc)
               (case proc
-      	        ('read rootNode)
+      	        ('root rootNode)
+                ('index (lambda (i) (index i)))
                 (else #f)))))
   )
 )
 
-(let ((ex (rope "example_text"))) (ex 'read))
+(define ex (rope "example_text"))
+((ex 'index) 0)
